@@ -1,0 +1,37 @@
+name: Coverage
+
+on:
+  workflow_dispatch:
+
+  push:
+    branches:
+    - master
+    - release/*
+
+  pull_request:
+    branches:
+    - master
+
+  pull_request_review_comment:
+    types: [created, edited]
+
+jobs:
+  coverage:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.event_name == 'pull_request' || github.event.comment.body == '/COVERAGE'
+    timeout-minutes: 45
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Setup
+      run: docker-compose up --timeout 1 --no-deps dev
+
+    - name: Coverage
+      run: docker-compose run dev -c 'yarn coverage'
+
+    - name: Upload Coverage
+      if: success()
+      uses: coverallsapp/github-action@v1.1.2
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        path-to-lcov: coverage-report.lcov

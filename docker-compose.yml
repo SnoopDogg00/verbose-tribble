@@ -1,0 +1,70 @@
+version: '3'
+
+services:
+  geth:
+    image: ethereum/client-go:v1.10.13
+    tty: true
+    volumes:
+      - ./scripts:/scripts
+    ports:
+      - 8222:8222
+    environment:
+      - GETH_ARGS=--networkid=1 --maxpeers=0 --nodiscover --miner.noverify --miner.gaslimit=24000000 --miner.gasprice=1 --http --http.port=8222 --http.api=eth,net,web3,debug,personal,miner --allow-insecure-unlock --http.addr=0.0.0.0 --http.corsdomain=* --http.vhosts=*
+    entrypoint: '/bin/sh -c "geth $$GETH_ARGS init /scripts/genesis.json && geth $$GETH_ARGS --preload /scripts/chainInit.js console"'
+
+  web:
+    volumes:
+      - .:/app
+    image: node:lts-alpine
+    ports:
+      - 8080:8080
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8080
+    command: '/bin/sh -c "cd /app && ./scripts/http.js"'
+
+  dev:
+    depends_on:
+      - geth
+      - web
+      - evolution
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+    image: node:lts-alpine
+    working_dir: /app
+    entrypoint: /bin/sh
+    # not needed anymore (private repo)
+    # printf '@NutBerry:registry=https://github.com/\n//github.com/:_authToken='$GITHUB_CREDENTIAL > .npmrc && yarn"
+    command: -c "yarn"
+    tty: true
+    stdin_open: true
+    environment:
+      - ROOT_RPC_URL=http://geth:8222/
+
+  evolution:
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8080
+      - TEST_ENV=1
+      - GITHUB_ORG=0xHabitat
+      - GITHUB_API_KEY=$GITHUB_API_KEY
+      - INFURA_API_KEY=$INFURA_API_KEY
+      - L2_RPC_URL=http://dev:8111/
+      - OPERATOR_ADDRESS=0x2951da2ba72dfe30da94988b4b3835a62f438c78
+      - OPERATOR_TOKEN=0x0ace32f6e87ac1457a5385f8eb0208f37263b415
+    ports:
+      - 1111:8080
+    volumes:
+      - ./backends/evolution:/app
+      - node_modules_evolution:/app/node_modules
+    image: node:lts-alpine
+    working_dir: /app
+    entrypoint: /bin/sh
+    command: "-c 'yarn && node index.mjs'"
+    tty: true
+    stdin_open: true
+
+volumes:
+  node_modules:
+  node_modules_evolution:
